@@ -2,11 +2,13 @@
 //!
 //! Build order: RMS first (smoke test), then the STFT front-end + mel.
 
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 mod mel;
 mod stft;
+mod temporal;
 
 /// Frame-wise RMS energy over a 1-D signal.
 ///
@@ -91,9 +93,43 @@ fn melspectrogram<'py>(
     Ok(out.into_pyarray(py))
 }
 
+/// Delta (Savitzky-Golay derivative) features along the last axis.
+///
+/// Mirrors ``librosa.feature.delta(data, width=9, order=1, axis=-1,
+/// mode="interp")``. `data` is a 2-D ``(n_features, n_frames)`` float64 array;
+/// the derivative is taken along ``n_frames`` (each row independently).
+#[pyfunction]
+#[pyo3(signature = (data, width=9, order=1))]
+fn delta<'py>(
+    py: Python<'py>,
+    data: PyReadonlyArray2<'py, f64>,
+    width: usize,
+    order: usize,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let view = data.as_array();
+    let n_cols = view.ncols();
+    if width < 3 || width % 2 == 0 {
+        return Err(PyValueError::new_err("width must be an odd integer >= 3"));
+    }
+    if width > n_cols {
+        return Err(PyValueError::new_err(format!(
+            "when mode='interp', width={width} cannot exceed data.shape[axis]={n_cols}"
+        )));
+    }
+    if order < 1 || order >= width {
+        return Err(PyValueError::new_err(
+            "order must be a positive integer less than width",
+        ));
+    }
+    let owned = view.to_owned();
+    let out = py.detach(move || temporal::delta(owned.view(), width, order));
+    Ok(out.into_pyarray(py))
+}
+
 #[pymodule]
 fn _rustlepy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rms, m)?)?;
     m.add_function(wrap_pyfunction!(melspectrogram, m)?)?;
+    m.add_function(wrap_pyfunction!(delta, m)?)?;
     Ok(())
 }

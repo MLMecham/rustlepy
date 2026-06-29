@@ -2,9 +2,9 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from ._rustlepy import melspectrogram, rms
+from ._rustlepy import delta, melspectrogram, rms
 
-__all__ = ["melspectrogram", "rms"]
+__all__ = ["delta", "melspectrogram", "rms"]
 
 try:
     __version__ = version("rustlepy")
