@@ -1,0 +1,50 @@
+[build-system]
+requires = ["maturin>=1.14,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rustlepy"
+description = "Rust-accelerated, librosa-compatible audio feature extraction (Rustle)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Mitchell Mecham", email = "mechamit000@gmail.com" }]
+keywords = ["audio", "dsp", "feature-extraction", "mel", "spectrogram", "librosa", "rust"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+]
+dynamic = ["version"]            # version is read from Cargo.toml (single source of truth)
+dependencies = [
+    "numpy>=1.23",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff",
+    "librosa>=0.10",            # parity oracle for tests
+    "numba>=0.61",             # librosa dep; floor it so uv can't backtrack to a pre-3.10 numba
+    "maturin>=1.14,<2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/MLMecham/rustlepy"
+Repository = "https://github.com/MLMecham/rustlepy"
+
+[tool.maturin]
+python-source = "python"            # Python package lives in python/rustlepy/
+module-name = "rustlepy._rustlepy"  # compiled extension nested inside the package
+features = ["pyo3/extension-module"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.uv]
+# Dev loop (see CONTRIBUTING.md):
+#   uv venv
+#   uv pip install -e ".[dev]"     # builds the Rust extension (editable) + dev deps
+#   uv run pytest                  # librosa parity tests
+#   uv run maturin develop --uv    # rebuild after editing any src/*.rs
