@@ -16,3 +16,4 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.29", features = ["abi3-py310"] }
 numpy = "0.29"
 ndarray = "0.17"
+realfft = "3.5"     # real-input FFT (rfft) for the STFT front-end; pulls rustfft 6.4.x

@@ -1,10 +1,12 @@
 //! Rustle core — the Rust extension module (`rustlepy._rustlepy`).
 //!
-//! Build order starts here with RMS: the smallest feature that still exercises
-//! the full Rust -> NumPy -> maturin -> uv loop (decode/FFT come later).
+//! Build order: RMS first (smoke test), then the STFT front-end + mel.
 
-use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
 use pyo3::prelude::*;
+
+mod mel;
+mod stft;
 
 /// Frame-wise RMS energy over a 1-D signal.
 ///
@@ -55,8 +57,43 @@ fn rms<'py>(
     Ok(out.into_pyarray(py))
 }
 
+/// Mel-scaled power spectrogram.
+///
+/// Mirrors ``librosa.feature.melspectrogram(y=..., sr=..., n_fft=2048,
+/// hop_length=512, n_mels=128, power=2.0, center=True)`` — Slaney mel scale,
+/// periodic Hann window, zero padding. Returns a 2-D ``(n_mels, n_frames)``
+/// float64 array.
+#[pyfunction]
+#[pyo3(signature = (y, sr=22050.0, n_fft=2048, hop_length=512, win_length=None, n_mels=128, fmin=0.0, fmax=None, power=2.0, center=true, htk=false))]
+#[allow(clippy::too_many_arguments)]
+fn melspectrogram<'py>(
+    py: Python<'py>,
+    y: PyReadonlyArray1<'py, f64>,
+    sr: f64,
+    n_fft: usize,
+    hop_length: usize,
+    win_length: Option<usize>,
+    n_mels: usize,
+    fmin: f64,
+    fmax: Option<f64>,
+    power: f64,
+    center: bool,
+    htk: bool,
+) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    let y_vec = y.as_array().to_vec();
+    let win = win_length.unwrap_or(n_fft);
+    let fmax = fmax.unwrap_or(sr / 2.0);
+    let out = py.detach(move || {
+        mel::melspectrogram(
+            &y_vec, sr, n_fft, hop_length, win, n_mels, fmin, fmax, power, center, htk,
+        )
+    });
+    Ok(out.into_pyarray(py))
+}
+
 #[pymodule]
 fn _rustlepy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rms, m)?)?;
+    m.add_function(wrap_pyfunction!(melspectrogram, m)?)?;
     Ok(())
 }
